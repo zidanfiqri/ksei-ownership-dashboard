@@ -1,1 +1,1 @@
-const PRICE_DATA = {};
+const SECTOR_DATA = {};
