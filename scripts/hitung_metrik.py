@@ -43,7 +43,7 @@ import math
 import sys
 from collections import defaultdict
 
-KLAS_MAYORITAS = "Mayoritas Tunggal"
+KLAS_MAYORITAS = "Mayoritas"
 KLAS_OLIGOPOLI = "Oligopoli"
 KLAS_TERKONSENTRASI = "Terkonsentrasi"
 KLAS_TERSEBAR = "Tersebar"
@@ -70,22 +70,27 @@ def load_fakta(path):
 def hitung_emiten(holder_pcts, n_holders):
     """Metrik konsentrasi satu emiten dari daftar persentase pemegang."""
     pcts = sorted(holder_pcts, reverse=True)
-    total = sum(pcts)
-    cr1 = pcts[0] if pcts else 0.0
-    cr3 = sum(pcts[:3])
-    hhi_raw = sum(p * p for p in pcts)
+    # pctSum/CR dihitung eksak dalam sen-persen (nilai sumber selalu 2 desimal)
+    cents = [int(round(p * 100)) for p in pcts]
+    total = sum(cents) / 100.0
+    cr1 = cents[0] / 100.0 if cents else 0.0
+    cr3 = sum(cents[:3]) / 100.0
+    # persis situs: hhiRaw = Math.round(sum pct^2) SEBELUM normalisasi
+    hhi_raw = half_up(sum(p * p for p in pcts))
     hhi_norm = min(hhi_raw / 10000.0, 1.0)
     cr3_norm = min(cr3 / 100.0, 1.0)
     holder_norm = max(0.0, 1.0 - (n_holders - 1) / 19.0)
     ccs = half_up((hhi_norm * 0.45 + cr3_norm * 0.35 + holder_norm * 0.20) * 100)
 
+    # persis situs: Terkonsentrasi/Tersebar memakai TOTAL TERCATAT (pctSum),
+    # bukan CCS — sesuai kode inline buildGroups
     if cr1 >= 50:
         klas = KLAS_MAYORITAS
     elif cr3 >= 60:
         klas = KLAS_OLIGOPOLI
-    elif ccs >= 70:
+    elif total >= 70:
         klas = KLAS_TERKONSENTRASI
-    elif ccs <= 40:
+    elif total <= 40:
         klas = KLAS_TERSEBAR
     else:
         klas = KLAS_MODERAT
@@ -96,7 +101,7 @@ def hitung_emiten(holder_pcts, n_holders):
         "free_float": round(max(0.0, 100.0 - total), 2),
         "cr1": round(cr1, 2),
         "cr3": round(cr3, 2),
-        "hhi_raw": half_up(hhi_raw),
+        "hhi_raw": hhi_raw,
         "ccs": ccs,
         "klasifikasi": klas,
     }
@@ -263,10 +268,9 @@ def main(argv=None):
             klas[v["klasifikasi"]] += 1
         add(f"## Periode {p}: {len(mm)} emiten")
         add(f"- Distribusi klasifikasi: {dict(sorted(klas.items(), key=lambda x: -x[1]))}")
-        b40 = sum(1 for v in mm.values() if v["ccs"] == 40)
-        b70 = sum(1 for v in mm.values() if v["ccs"] == 70)
-        add(f"- Kasus batas: CCS==40 -> {b40} emiten (Tersebar per aturan <=40); "
-            f"CCS==70 -> {b70} emiten")
+        b40 = sum(1 for v in mm.values() if v["total_tercatat"] == 40)
+        b70 = sum(1 for v in mm.values() if v["total_tercatat"] == 70)
+        add(f"- Kasus batas (total tercatat tepat 40/70): {b40}/{b70} emiten")
         ff0 = sum(1 for v in mm.values() if v["free_float"] == 0)
         add(f"- Free float 0% (kepemilikan tercatat >=100%): {ff0}")
         add("")
@@ -322,9 +326,10 @@ def main(argv=None):
         add("")
 
     add("## Catatan")
-    add("- Klasifikasi 'Terkonsentrasi' praktis tidak muncul: urutan aturan "
-        "membuat emiten ber-CCS>=70 hampir selalu tertangkap Mayoritas/"
-        "Oligopoli lebih dulu — perilaku bawaan rumus situs asli.")
+    add("- KOREKSI dari versi awal: Terkonsentrasi/Tersebar memakai ambang "
+        "TOTAL TERCATAT (pctSum >=70 / <=40), bukan CCS — diverifikasi dari "
+        "kode inline buildGroups situs asli; hhiRaw juga dibulatkan sebelum "
+        "normalisasi, persis Math.round situs.")
     add("- Free float terverifikasi terhadap UI situs asli: AALI 18,14 / "
         "ABBA 25,33 / AADI 20,51 (screenshot Guide).")
     add("- Duplikat rekening (kasus ICON) diagregasi sebelum perbandingan "
