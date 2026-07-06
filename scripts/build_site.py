@@ -47,6 +47,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import shutil
 import sys
 
@@ -226,6 +227,21 @@ def main(argv=None):
     for i, (_, baru) in enumerate(ganti):
         src = src.replace(f"\x00PATCH{i}\x00", baru)
 
+    # Dua tanggal changelog dideklarasikan INLINE di source asli
+    # (const CHANGELOG_DATA_DATE / CHANGELOG_PREV_DATE) — patch nilainya di
+    # tempat, JANGAN dideklarasikan lagi di changelog_data.js (menyebabkan
+    # "Identifier ... has already been declared").
+    for var, val in [("CHANGELOG_DATA_DATE", tgl_id(cl["periode_baru"])),
+                     ("CHANGELOG_PREV_DATE", tgl_id(cl["periode_lama"]))]:
+        pat = re.compile(r"const " + var + r" = '[^']*';")
+        src, n = pat.subn(
+            (lambda v: lambda m: f"const {var} = {json.dumps(v)};")(val),
+            src, count=1)
+        if n != 1:
+            print(f"FATAL: deklarasi inline {var} tak ditemukan tepat 1x "
+                  f"(n={n})", file=sys.stderr)
+            return 2
+
     # ---------- tulis docs/ ----------
     os.makedirs(args.docs, exist_ok=True)
     out = {}
@@ -233,9 +249,7 @@ def main(argv=None):
     out["data.js"] = dump_js("KSEI_DATA", ksei)
     out["changelog_data.js"] = (
         dump_js("CHANGELOG_DATA", cl_data)
-        + dump_js("INV_CHANGES", inv_changes)
-        + f'const CHANGELOG_DATA_DATE = {json.dumps(tgl_id(cl["periode_baru"]))};\n'
-        + f'const CHANGELOG_PREV_DATE = {json.dumps(tgl_id(cl["periode_lama"]))};\n')
+        + dump_js("INV_CHANGES", inv_changes))
     out["sector_data.js"] = dump_js("SECTOR_DATA", sector)
     out["price_data.js"] = dump_js("PRICE_DATA", price)
     for name, content in out.items():
