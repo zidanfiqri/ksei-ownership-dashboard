@@ -39,6 +39,7 @@ from collections import Counter, defaultdict
 import pdfplumber
 
 DATE_RE = re.compile(r"^\d{2}-[A-Za-z]{3}-\d{4}$")
+DATE_CODE_FUSED_RE = re.compile(r"^(\d{2}-[A-Za-z]{3}-\d{4})([A-Z0-9]{4})$")
 CODE_RE = re.compile(r"^[A-Z0-9]{4}$")
 NUM_RE = re.compile(r"^(?:\d{1,3}(?:\.\d{3})*|0)$")
 PCT_RE = re.compile(r"^\d{1,3},\d{1,2}$")
@@ -88,10 +89,10 @@ def page_boundaries(page, prev_bounds):
         return bounds, False
     if prev_bounds is not None:
         return prev_bounds, True
-    raise RuntimeError(
-        f"Grid kolom tidak ditemukan di halaman pertama "
-        f"(ditemukan {len(bounds)} batas, butuh {N_BOUNDS})."
-    )
+    # Belum pernah ketemu grid valid sama sekali sampai halaman ini (mis.
+    # halaman sampul/penafian tanpa tabel) -> sinyalkan "lewati", JANGAN
+    # crash. parse_pdf() akan lanjut ke halaman berikutnya dan mencoba lagi.
+    return None, None
 
 
 def rows_from_words(words):
@@ -189,6 +190,8 @@ def parse_pdf(pdf_path):
         "skipped_other": 0,
         "bounds_fallback_pages": [],
         "splits": [],
+        "date_code_splits": 0,
+        "pages_no_grid": [],
     }
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -196,6 +199,12 @@ def parse_pdf(pdf_path):
         bounds = None
         for pageno, page in enumerate(pdf.pages, start=1):
             bounds, used_fallback = page_boundaries(page, bounds)
+            if bounds is None:
+                # Belum ada grid valid sama sekali sampai halaman ini (mis.
+                # halaman sampul/penafian) -> lewati, coba lagi halaman
+                # berikutnya. TIDAK memproses baris di halaman ini.
+                stats["pages_no_grid"].append(pageno)
+                continue
             if used_fallback:
                 stats["bounds_fallback_pages"].append(pageno)
 
@@ -206,14 +215,30 @@ def parse_pdf(pdf_path):
                 ws = row["words"]
                 first = ws[0]["text"]
                 if not DATE_RE.match(first):
-                    joined = " ".join(w["text"] for w in ws)
-                    if "DATE" in joined and "SHARE_CODE" in joined:
-                        stats["skipped_header"] += 1
-                    elif joined.startswith("#") or "Kode A" in joined:
-                        stats["skipped_footer"] += 1
+                    m = DATE_CODE_FUSED_RE.match(first)
+                    if m:
+                        # Tanggal & kode saham menempel jadi satu word (jarak
+                        # x di PDF ini < x_tolerance) -> pisahkan dulu. x0
+                        # bagian kode dipin ke batas grid kolom asli
+                        # (bounds[1]) supaya assign_columns tetap benar
+                        # tanpa perlu geometri huruf yang presisi.
+                        date_txt, code_txt = m.group(1), m.group(2)
+                        orig = ws[0]
+                        date_w = dict(orig, text=date_txt)
+                        code_w = dict(orig, text=code_txt,
+                                       x0=bounds[1], x1=bounds[1] + 1)
+                        ws = [date_w, code_w] + ws[1:]
+                        first = date_txt
+                        stats["date_code_splits"] += 1
                     else:
-                        stats["skipped_other"] += 1
-                    continue
+                        joined = " ".join(w["text"] for w in ws)
+                        if "DATE" in joined and "SHARE_CODE" in joined:
+                            stats["skipped_header"] += 1
+                        elif joined.startswith("#") or "Kode A" in joined:
+                            stats["skipped_footer"] += 1
+                        else:
+                            stats["skipped_other"] += 1
+                        continue
 
                 vals = assign_columns(ws, bounds, stats["splits"])
                 loc = f"hal.{pageno} y={row['top']:.1f}"
@@ -289,10 +314,14 @@ def build_report(records, issues, stats, pdf_path, baseline_rows=None):
     add(f"- Tanggal periode: **{dict(dates)}**")
     add(f"- Baris ber-scrip (>0): {scrip_pos}")
     add(f"- Baris dilewati — header: {stats['skipped_header']}, footer: {stats['skipped_footer']}, lainnya (disklaimer dsb.): {stats['skipped_other']}")
+    if stats.get("date_code_splits"):
+        add(f"- Tanggal+kode saham menempel (dipisah otomatis): {stats['date_code_splits']} baris")
     if stats["splits"]:
         add(f"- Perbaikan batas emiten->investor (fragmen Tbk dikembalikan): {len(stats['splits'])} -> {stats['splits'][:6]}")
     if stats["bounds_fallback_pages"]:
         add(f"- Halaman memakai grid fallback: {stats['bounds_fallback_pages']}")
+    if stats.get("pages_no_grid"):
+        add(f"- Halaman dilewati (belum ada grid tabel — mis. sampul/penafian): {stats['pages_no_grid']}")
     add("")
     add("## Distribusi nilai")
     add(f"- Lokal/Asing: {dict(lf.most_common())}")
