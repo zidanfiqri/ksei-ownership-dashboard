@@ -92,19 +92,29 @@ def parse_excel(path, sheet_name=None):
     actual_header = next(
         ws.iter_rows(min_row=header_row, max_row=header_row, values_only=True)
     )
-    if list(actual_header) != EXPECTED_HEADER:
+    # Hanya 12 kolom pertama yang wajib cocok persis. Kolom ekstra di luar
+    # itu (mis. kolom ke-13 kosong tanpa header, artefak Excel) ditoleransi
+    # ASAL memang kosong di header-nya -- kalau ternyata berlabel, itu bisa
+    # jadi kolom baru yang perlu ditinjau, jadi dicatat sbg peringatan
+    # (bukan crash) supaya tidak diam-diam kebuang.
+    if list(actual_header[:12]) != EXPECTED_HEADER:
         raise RuntimeError(
-            f"Header ditemukan di baris {header_row} tapi urutan/nama kolom "
-            f"beda dari yang diharapkan.\n  ditemukan: {list(actual_header)}\n"
+            f"Header ditemukan di baris {header_row} tapi 12 kolom pertama "
+            f"beda dari yang diharapkan.\n  ditemukan: {list(actual_header[:12])}\n"
             f"  diharap  : {EXPECTED_HEADER}"
         )
+    extra_header_labels = [v for v in actual_header[12:] if v is not None]
 
     records = []
     issues = defaultdict(list)
-    stats = {"sheet": ws.title, "header_row": header_row, "baris_kosong": 0}
+    stats = {
+        "sheet": ws.title, "header_row": header_row, "baris_kosong": 0,
+        "extra_header_labels": extra_header_labels,
+    }
 
     for rownum, row in enumerate(
-        ws.iter_rows(min_row=header_row + 1, values_only=True), start=header_row + 1
+        ws.iter_rows(min_row=header_row + 1, max_col=12, values_only=True),
+        start=header_row + 1,
     ):
         (date, code, issuer, investor, classif, lf, nat, dom,
          scripless, scrip, total, pct) = row
@@ -201,6 +211,10 @@ def build_report(records, issues, stats, src_path, baseline_rows=None):
     add(f"- Tanggal periode: **{dict(dates)}**")
     add(f"- Baris ber-scrip (>0): {scrip_pos}")
     add(f"- Baris kosong dilewati: {stats['baris_kosong']}")
+    if stats.get("extra_header_labels"):
+        add(f"- **PERHATIAN**: ada label kolom di luar 12 kolom standar (kolom ke-13+): "
+            f"{stats['extra_header_labels']} — kolom ini TIDAK dibaca/diikutkan, tinjau manual "
+            f"kalau ternyata berisi data penting.")
     add("")
     add("## Distribusi nilai")
     add(f"- Lokal/Asing: {dict(lf.most_common())}")
