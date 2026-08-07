@@ -318,11 +318,21 @@ def main(argv=None):
             f"{'KONSISTEN' if ov_b == ov_l else '**TIDAK KONSISTEN**'}")
         if ov_b != ov_l:
             ok = False
-        wbsa_ok = "WBSA" in changelog["saham_baru"]
-        add(f"- UJI WAJIB — WBSA sebagai Saham Baru: "
-            f"{'LULUS' if wbsa_ok else '**GAGAL**'}")
-        if not wbsa_ok:
-            ok = False
+        # UJI WAJIB WBSA ini awalnya regression-test SEKALI PAKAI untuk
+        # transisi 12 Mar->29 Mei 2026 (saat pipeline pertama divalidasi,
+        # WBSA memang saham baru di pasangan periode itu). Changelog SELALU
+        # membandingkan 2 periode TERBARU -- begitu ada periode baru masuk,
+        # pasangan yg dibandingkan bergeser dan WBSA sudah bukan lagi
+        # "saham baru". Supaya tidak jadi alarm palsu di bulan-bulan
+        # berikutnya, uji ini hanya aktif kalau pasangan periode yang
+        # sedang dibandingkan MEMANG pasangan Mar->Mei tsb.
+        if (changelog["periode_lama"], changelog["periode_baru"]) == \
+                ("2026-03-12", "2026-05-29"):
+            wbsa_ok = "WBSA" in changelog["saham_baru"]
+            add(f"- UJI WAJIB — WBSA sebagai Saham Baru (khusus periode "
+                f"12 Mar->29 Mei): {'LULUS' if wbsa_ok else '**GAGAL**'}")
+            if not wbsa_ok:
+                ok = False
         add("")
 
     add("## Catatan")

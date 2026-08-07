@@ -55,10 +55,16 @@ BULAN_ID = {1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei",
             6: "Juni", 7: "Juli", 8: "Agustus", 9: "September",
             10: "Oktober", 11: "November", 12: "Desember"}
 
-HEADER_LAMA = ("Per 27 Feb 2026 &nbsp;\u00b7&nbsp; Sumber: KSEI "
-               "&nbsp;\u00b7&nbsp; Harga: 12 Mar 2026")
-GUIDE_PERIODE_LAMA = "Per 12 Maret 2026"
-GUIDE_PEMBANDING_LAMA = "3 Maret 2026"
+HEADER_LAMA = ("Per 29 Mei 2026 &nbsp;\u00b7&nbsp; Sumber: KSEI "
+               "&nbsp;\u00b7&nbsp; Harga: 29 Mei 2026")
+GUIDE_PERIODE_LAMA = "Per 29 Mei 2026"
+# PENTING: sengaja disertai konteks "Dibandingkan dengan:" di depannya, BUKAN
+# cuma "12 Maret 2026" polos -- karena tanggal yang sama juga muncul di baris
+# kode JS "const CHANGELOG_PREV_DATE = '12 Maret 2026';" lebih bawah. Kalau
+# cuma cocokkan tanggalnya saja, replace ini akan ikut menimpa baris JS itu
+# (str.replace mengganti SEMUA kemunculan), lalu patch CHANGELOG_PREV_DATE
+# di bawah gagal karena nilainya sudah berubah lebih dulu.
+GUIDE_PEMBANDING_LAMA = "Dibandingkan dengan: <strong>12 Maret 2026</strong>"
 
 
 def tgl_id(iso):
@@ -211,7 +217,8 @@ def main(argv=None):
          f"Per {disp_baru} &nbsp;\u00b7&nbsp; Sumber: KSEI "
          f"&nbsp;\u00b7&nbsp; Harga: {disp_harga}"),
         (GUIDE_PERIODE_LAMA, f"Per {disp_baru}"),
-        (GUIDE_PEMBANDING_LAMA, disp_lama),
+        (GUIDE_PEMBANDING_LAMA,
+         f"Dibandingkan dengan: <strong>{disp_lama}</strong>"),
     ]
     # Dua fase agar hasil patch tidak menabrak literal berikutnya
     # (mis. build baseline membuat header berisi "Per 12 Maret 2026").
@@ -233,7 +240,7 @@ def main(argv=None):
     # "Identifier ... has already been declared").
     for var, val in [("CHANGELOG_DATA_DATE", tgl_id(cl["periode_baru"])),
                      ("CHANGELOG_PREV_DATE", tgl_id(cl["periode_lama"]))]:
-        pat = re.compile(r"const " + var + r" = '[^']*';")
+        pat = re.compile(r"const " + var + r" = [\"'][^\"']*[\"'];")
         src, n = pat.subn(
             (lambda v: lambda m: f"const {var} = {json.dumps(v)};")(val),
             src, count=1)
@@ -255,8 +262,18 @@ def main(argv=None):
     for name, content in out.items():
         with open(os.path.join(args.docs, name), "w", encoding="utf-8") as f:
             f.write(content)
-    shutil.copy(args.pep, os.path.join(args.docs, "pep_data.js"))
-    shutil.copy(args.konglo, os.path.join(args.docs, "konglo_data.js"))
+    def salin_aman(src, dst):
+        # Lewati kalau src & dst kebetulan file yang sama (mis. --pep
+        # menunjuk ke dalam folder --docs itu sendiri) -- shutil.copy akan
+        # crash SameFileError kalau dipaksa, padahal secara isi memang
+        # sudah benar/tidak perlu disalin ulang.
+        if os.path.exists(dst) and os.path.exists(src) and \
+                os.path.samefile(src, dst):
+            return
+        shutil.copy(src, dst)
+
+    salin_aman(args.pep, os.path.join(args.docs, "pep_data.js"))
+    salin_aman(args.konglo, os.path.join(args.docs, "konglo_data.js"))
     open(os.path.join(args.docs, ".nojekyll"), "w").close()
 
     # ---------- laporan ----------

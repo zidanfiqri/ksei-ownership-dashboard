@@ -4,6 +4,11 @@
     "dasar": "definisi",
     "kode": ""
   },
+  "Association/Social Organizations": {
+    "catatan": "keputusan manual: disamakan dgn entitas sosial/non-standar lain (sama pola dgn Diocese, Cooperatives, International Organization)",
+    "dasar": "manual",
+    "kode": "OT"
+  },
   "Bank": {
     "akurasi": 0.9906,
     "dasar": "empiris",
