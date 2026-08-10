@@ -113,7 +113,9 @@ def buat_changelog_js(cl, nama_baru, nama_lama):
             "issuer_name": nama_baru.get(kode, ""),
             "investors": inv_baru(e.get("investor_baru", [])),
         })
-    removed_stocks = [{"share_code": k, "issuer_name": nama_lama.get(k, "")}
+    removed_stocks = [{"share_code": k, "issuer_name": nama_lama.get(k, ""),
+                       "investor_count": len(cl["per_saham"].get(k, {})
+                                             .get("investor_keluar", []))}
                       for k in cl["saham_dihapus"]]
 
     changes = []
