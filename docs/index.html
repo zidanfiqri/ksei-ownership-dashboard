@@ -8250,6 +8250,7 @@ function showChangelogNotif() {
       totalShareChanges += (s.share_changes || []).length;
     });
     newStocks.forEach(function(s) { totalNewInv += (s.investors || []).length; });
+    removedStocks.forEach(function(s) { totalRemovedInv += (s.investor_count || 0); });
 
     // Date
     document.getElementById('clNotifDate').textContent = CHANGELOG_DATA_DATE + ' vs ' + CHANGELOG_PREV_DATE;
@@ -8975,6 +8976,7 @@ function renderChangelogTab() {
   });
   // New stocks also have investors (all new)
   newStocks.forEach(s => { totalNewInv += (s.investors || []).length; });
+  removedStocks.forEach(s => { totalRemovedInv += (s.investor_count || 0); });
 
   let html = '';
 
