@@ -1,10 +1,8 @@
-# ksei-ownership-dashboard
-
 # IDX 1% Ownership Dashboard
 
 Dashboard transparansi kepemilikan saham Bursa Efek Indonesia (IDX) — menampilkan seluruh investor yang memegang **≥1% saham** di setiap emiten, berdasarkan laporan resmi **KSEI** (Kustodian Sentral Efek Indonesia). Diperkaya dengan skor konsentrasi kepemilikan, pemetaan grup konglomerat, dan penandaan tokoh politik (PEP).
 
-🔗 **Live:** `https://<username-github-anda>.github.io/ksei-ownership-dashboard/` — aktifkan lewat *Settings → Pages* (sumber: folder `docs/`) kalau belum aktif.
+🔗 **Live:** [ksei-ownership-dashboard.vercel.app](https://ksei-ownership-dashboard.vercel.app/)
 
 > Proyek riset & transparansi publik. Bukan rekomendasi jual/beli — selalu cek ulang ke sumber resmi ([ksei.co.id](https://www.ksei.co.id)) sebelum mengambil keputusan investasi.
 
