@@ -130,7 +130,10 @@ def parse_excel(path, sheet_name=None):
             continue
         date_s = date_to_str(date)
 
-        code = (code or "").strip()
+        # Excel membaca kode TRUE (Triniti Dinamik) sebagai boolean
+        if isinstance(code, bool):
+            code = "TRUE" if code else "FALSE"
+        code = str(code or "").strip().upper()
         if not CODE_RE.match(code):
             issues["kode_tidak_valid"].append(f"{loc}: {code!r}")
             continue
@@ -181,10 +184,21 @@ def parse_excel(path, sheet_name=None):
 
     by_code = {}
     for r in records:
-        by_code.setdefault(r["share_code"], set()).add(r["issuer_name"])
+        by_code.setdefault(r["share_code"], Counter())[r["issuer_name"]] += 1
     for k, v in sorted(by_code.items()):
         if len(v) > 1:
-            issues["emiten_tidak_seragam"].append(f"{k}: {sorted(v)}")
+            # Salah ketik nama emiten di file sumber (contoh 30 Sep 2026: satu baris MLPL tertulis
+            # "MULIA INDUSTRINDO Tbk"). Kalau ada satu nama mayoritas yang jelas, baris minoritas
+            # diseragamkan dan dicatat sebagai koreksi, bukan menghentikan proses.
+            (utama, n1), (_, n2) = v.most_common(2)
+            if n1 > n2:
+                for r in records:
+                    if r["share_code"] == k and r["issuer_name"] != utama:
+                        stats.setdefault("koreksi_nama", []).append(
+                            f"{k} baris {r['_row']}: '{r['issuer_name']}' -> '{utama}'")
+                        r["issuer_name"] = utama
+            else:
+                issues["emiten_tidak_seragam"].append(f"{k}: {sorted(v)}")
 
     return records, issues, stats
 
@@ -211,6 +225,8 @@ def build_report(records, issues, stats, src_path, baseline_rows=None):
     add(f"- Tanggal periode: **{dict(dates)}**")
     add(f"- Baris ber-scrip (>0): {scrip_pos}")
     add(f"- Baris kosong dilewati: {stats['baris_kosong']}")
+    for x in stats.get("koreksi_nama", []):
+        add(f"- Koreksi nama emiten: {x}")
     if stats.get("extra_header_labels"):
         add(f"- **PERHATIAN**: ada label kolom di luar 12 kolom standar (kolom ke-13+): "
             f"{stats['extra_header_labels']} — kolom ini TIDAK dibaca/diikutkan, tinjau manual "

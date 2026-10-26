@@ -67,6 +67,28 @@ GUIDE_PERIODE_LAMA = "Per 29 Mei 2026"
 GUIDE_PEMBANDING_LAMA = "Dibandingkan dengan: <strong>12 Maret 2026</strong>"
 
 
+def baca_template(source, docs):
+    """Pakai source.html bila ada. Bila tidak ada (misalnya di Codespaces atau clone baru),
+    bangun ulang template dari docs/index.html hasil build sebelumnya: label tanggal yang
+    sudah dipatch dikembalikan ke teks asli supaya patch di bawah tetap bisa jalan."""
+    if source and os.path.exists(source):
+        return open(source, encoding="utf-8").read()
+    jalur = os.path.join(docs, "index.html")
+    if not os.path.exists(jalur):
+        raise SystemExit(f"FATAL: {source} dan {jalur} tidak ditemukan")
+    print(f"INFO: {source} tidak ada, template dibangun dari {jalur}")
+    src = open(jalur, encoding="utf-8").read()
+    tgl = r"\d{1,2} [A-Za-z]+ \d{4}"
+    src, n1 = re.subn(r"Per " + tgl + r" &nbsp;·&nbsp; Sumber: KSEI &nbsp;·&nbsp; Harga: (?:" + tgl + r"|-)",
+                      lambda m: HEADER_LAMA, src)
+    src, n2 = re.subn(r"Dibandingkan dengan: <strong>(?:" + tgl + r"|-)</strong>",
+                      lambda m: GUIDE_PEMBANDING_LAMA, src)
+    src, n3 = re.subn(r"(?<![\w.])Per " + tgl + r"(?= *<)", lambda m: GUIDE_PERIODE_LAMA, src)
+    if not (n1 and n2 and n3):
+        raise SystemExit(f"FATAL: label tanggal di {jalur} tidak lengkap (header {n1}, pembanding {n2}, guide {n3})")
+    return src
+
+
 def tgl_id(iso):
     y, m, d = iso.split("-")
     return f"{int(d)} {BULAN_ID[int(m)]} {y}"
@@ -209,7 +231,7 @@ def main(argv=None):
                         harga_tanggal = v["harga_tanggal"]
 
     # ---------- index.html: patch label tanggal (wajib persis ketemu) ----------
-    src = open(args.source, encoding="utf-8").read()
+    src = baca_template(args.source, args.docs)
     disp_baru = tgl_id(periode)
     disp_lama = tgl_id(cl["periode_lama"]) if periode == cl["periode_baru"] \
         else "-"

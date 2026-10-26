@@ -108,6 +108,10 @@ def load_parsed(path):
     return rows
 
 
+def norm_label(s):
+    return re.sub(r"[^a-z]", "", (s or "").lower())
+
+
 def derive_mapping(parsed_rows, baseline_rows, existing):
     """label klasifikasi -> kode tipe, berdasarkan irisan (kode, investor)."""
     base_tipe = {}
@@ -129,6 +133,16 @@ def derive_mapping(parsed_rows, baseline_rows, existing):
         if label == "":
             mapping[label] = {"kode": "", "dasar": "definisi",
                               "catatan": "rekening warkat khusus tanpa klasifikasi"}
+            continue
+        # BEI kadang mengganti huruf besar kecil atau spasi label (contoh: "Sole Proprietorship"
+        # menjadi "Sole proprietorship", "PermanentEstablishment" menjadi "Permanent establishment").
+        # Label yang sama setelah dinormalisasi memakai pemetaan yang sudah ada.
+        kembar = next((l for l, m in mapping.items()
+                       if l != label and norm_label(l) == norm_label(label)
+                       and m.get("kode") in KODE_TIPE_SAH), None)
+        if kembar:
+            mapping[label] = {"kode": mapping[kembar]["kode"], "dasar": "sama dengan label lama",
+                              "catatan": f"varian penulisan dari '{kembar}'"}
             continue
         ev = evidence.get(label)
         if ev:
@@ -333,12 +347,13 @@ def main(argv=None):
     all_rows.sort(key=lambda r: (r["periode"], r["kode"], -r["persentase"],
                                  r["investor"]))
 
-    known_anomalies = set()
-    if args.periode_baseline:
-        known_anomalies = {
-            (args.periode_baseline, "ICON", "ISLAND REGENCY GROUP LIMITED"),
-            (args.periode_baseline, "MAYA", "MAYAPADA KARUNIA PT"),
-        }
+    # Anomali baseline yang sudah terdokumentasi tetap dikenali walau --periode-baseline
+    # tidak diberikan (update bulanan biasa tidak memakai data.js lagi).
+    periode_base = args.periode_baseline or "2026-03-12"
+    known_anomalies = {
+        (periode_base, "ICON", "ISLAND REGENCY GROUP LIMITED"),
+        (periode_base, "MAYA", "MAYAPADA KARUNIA PT"),
+    }
     issues = validate(all_rows, known_anomalies)
 
     per_code = defaultdict(dict)
