@@ -401,7 +401,7 @@ def build_report(records, issues, stats, pdf_path, baseline_rows=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Parser PDF KSEI kepemilikan 1%")
-    ap.add_argument("pdf", help="path PDF laporan 1%")
+    ap.add_argument("pdf", help="path PDF laporan 1%%")
     ap.add_argument("-o", "--output", required=True, help="path CSV keluaran")
     ap.add_argument("--meta", help="path JSON metadata keluaran")
     ap.add_argument("--report", help="path laporan validasi (markdown)")

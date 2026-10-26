@@ -45,7 +45,7 @@ def tanggal_csv(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("excel", nargs="+", help="file Excel laporan pemegang saham di atas 1%")
+    ap.add_argument("excel", nargs="+", help="file Excel laporan pemegang saham di atas 1%%")
     ap.add_argument("--skip-harga", action="store_true", help="lewati pengambilan harga dan sektor dari Yahoo Finance")
     a = ap.parse_args()
 

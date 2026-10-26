@@ -9,6 +9,11 @@
     "dasar": "manual",
     "kode": "OT"
   },
+  "Association/social organizations": {
+    "catatan": "varian penulisan dari 'Association/Social Organizations'",
+    "dasar": "sama dengan label lama",
+    "kode": "OT"
+  },
   "Bank": {
     "akurasi": 0.9906,
     "dasar": "empiris",
@@ -38,6 +43,11 @@
     },
     "sampel": 13
   },
+  "Capital Market Supporting Institutions and Professions": {
+    "catatan": "varian penulisan dari 'Capital Market Supporting Institutions And Professions'",
+    "dasar": "sama dengan label lama",
+    "kode": "CP"
+  },
   "Commanditaire Vennootschap (CV) Or Limited Partnership": {
     "akurasi": 1.0,
     "dasar": "empiris",
@@ -46,6 +56,11 @@
       "CP": 9
     },
     "sampel": 9
+  },
+  "Commanditaire Vennootschap (CV) or Limited partnership": {
+    "catatan": "varian penulisan dari 'Commanditaire Vennootschap (CV) Or Limited Partnership'",
+    "dasar": "sama dengan label lama",
+    "kode": "CP"
   },
   "Cooperatives": {
     "akurasi": 1.0,
@@ -173,6 +188,11 @@
     },
     "sampel": 3
   },
+  "International organization": {
+    "catatan": "varian penulisan dari 'International Organization'",
+    "dasar": "sama dengan label lama",
+    "kode": "OT"
+  },
   "Investment Advisors": {
     "akurasi": 0.7037,
     "dasar": "empiris",
@@ -233,6 +253,11 @@
     },
     "sampel": 2
   },
+  "Peer to peer lending": {
+    "catatan": "varian penulisan dari 'Peer To Peer Lending'",
+    "dasar": "sama dengan label lama",
+    "kode": "CP"
+  },
   "Pension Funds": {
     "akurasi": 1.0,
     "dasar": "empiris",
@@ -241,6 +266,11 @@
       "PF": 44
     },
     "sampel": 44
+  },
+  "Permanent establishment": {
+    "catatan": "varian penulisan dari 'PermanentEstablishment'",
+    "dasar": "sama dengan label lama",
+    "kode": "CP"
   },
   "PermanentEstablishment": {
     "akurasi": 1.0,
@@ -292,6 +322,11 @@
       "IB": 1
     },
     "sampel": 22
+  },
+  "Sole proprietorship": {
+    "catatan": "varian penulisan dari 'Sole Proprietorship'",
+    "dasar": "sama dengan label lama",
+    "kode": "CP"
   },
   "Sovereign Wealth Fund": {
     "akurasi": 1.0,

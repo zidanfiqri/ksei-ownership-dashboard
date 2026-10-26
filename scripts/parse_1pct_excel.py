@@ -279,7 +279,7 @@ def build_report(records, issues, stats, src_path, baseline_rows=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Parser Excel KSEI kepemilikan 1%")
-    ap.add_argument("excel", help="path file .xlsx laporan 1%")
+    ap.add_argument("excel", help="path file .xlsx laporan 1%%")
     ap.add_argument("-o", "--output", required=True, help="path CSV keluaran")
     ap.add_argument("--sheet", help="nama sheet (default: sheet pertama)")
     ap.add_argument("--meta", help="path JSON metadata keluaran")
