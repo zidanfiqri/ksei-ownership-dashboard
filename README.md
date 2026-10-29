@@ -1,123 +1,71 @@
-# IDX 1% Ownership Dashboard
+# Peta Kepemilikan Institusi IDX
 
-Dashboard transparansi kepemilikan saham Bursa Efek Indonesia (IDX) — menampilkan seluruh investor yang memegang **≥1% saham** di setiap emiten, berdasarkan laporan resmi **KSEI** (Kustodian Sentral Efek Indonesia). Diperkaya dengan skor konsentrasi kepemilikan, pemetaan grup konglomerat, dan penandaan tokoh politik (PEP).
+Dashboard statis komposisi kepemilikan saham Bursa Efek Indonesia per tipe investor, dari data resmi KSEI dan BEI.
 
-🔗 **Live:** [ksei-ownership-dashboard.vercel.app](https://ksei-ownership-dashboard.vercel.app/)
+## Halaman
 
-> Proyek riset & transparansi publik. Bukan rekomendasi jual/beli — selalu cek ulang ke sumber resmi ([ksei.co.id](https://www.ksei.co.id)) sebelum mengambil keputusan investasi.
-
----
-
-## Fitur Utama
-
-| Tab | Isi |
+| File | Isi |
 |---|---|
-| 📊 **Ringkasan Saham** | Kartu per emiten: daftar pemegang saham 1%+, skor **CCS** (konsentrasi kepemilikan 0–100), free float, filter (lokal/asing, free float, sektor), search, mode bandingkan hingga 6 saham, graph jaringan koneksi investor, export CSV |
-| 👤 **Per Investor** | Kebalikan dari Ringkasan Saham — satu investor, semua saham yang dipegang, estimasi nilai (AUM), filter tipe/asal/label PEP-Konglo |
-| 🏢 **Konglo Stocks** | Saham dikelompokkan per grup konglomerat besar Indonesia (kategori Main / Small-Micro / Investor-Sharing) |
-| 📈 **Metrik** | Belasan chart analitik: lokal vs asing, tipe investor, top investor, sebaran negara, distribusi CCS, CCS rata-rata per sektor, jejak kepemilikan PEP & Konglo |
-| 🕒 **Changelog** | Perbandingan otomatis dua periode terakhir — saham baru/dihapus, investor masuk/keluar, perubahan jumlah kepemilikan |
+| `index.html` | Peta Kepemilikan Institusi: komposisi 18 tipe investor lokal dan asing per emiten, radar net flow asing |
+| `smart_money_tracker.html` | Smart Money Tracker: inflow asing, pola distribusi, watchlist |
+| `screener.html` | Screener saham non HSC berdasarkan porsi asing: filter market cap, free float, sektor; breakdown tipe investor asing; daftar HSC; ekspor Excel |
 
-## Sumber Data
+## Sumber data
 
-- **Kepemilikan saham** — laporan bulanan KSEI *"Kepemilikan Investor di atas 1%"* (format Excel/PDF)
-- **Harga & sektor** — Yahoo Finance (opsional, per emiten)
-- **PEP & Konglomerat** — kurasi manual dari sumber publik, untuk tujuan riset, bukan tuduhan
+| Data | Sumber | Frekuensi | File di repo |
+|---|---|---|---|
+| Balance position lokal dan asing, 9 tipe | KSEI, Publikasi > Data dan Statistik > Kepemilikan Efek | Bulanan | `data.json`, `emiten_info.json` |
+| Pemegang saham di atas 1% | BEI, Perusahaan Tercatat > Data Kepemilikan Saham | Bulanan | `data_src/1pct/` |
+| Kepemilikan per 39 klasifikasi investor | BEI, Perusahaan Tercatat > Data Kepemilikan Saham | Bulanan | `data_src/klasifikasi/` |
+| Daftar HSC (High Shareholding Concentration) | BEI, Perusahaan Tercatat > Kepemilikan Saham Terkonsentrasi Tinggi | Setiap ada pengumuman | `data_src/bei_hsc_pengumuman.csv`, `hsc.json` |
 
-## Struktur Proyek
+## Update data
 
-```
-ksei-ownership-dashboard/
-├── data/
-│   ├── fakta.csv             # tabel fakta gabungan SEMUA periode — sumber kebenaran utama
-│   ├── changelog.json        # perbandingan 2 periode terbaru
-│   ├── metrik.json           # metrik konsentrasi per emiten per periode
-│   ├── pemetaan_tipe.json    # pemetaan klasifikasi investor KSEI -> 9 kode tipe situs
-│   └── emiten.json           # (opsional) harga & sektor dari Yahoo Finance
-├── docs/                     # di-serve GitHub Pages — INI yang live
-│   ├── index.html
-│   ├── data.js / changelog_data.js / sector_data.js / price_data.js
-│   ├── pep_data.js / konglo_data.js     # kurasi manual, disalin apa adanya saat build
-│   └── .nojekyll
-├── scripts/
-│   ├── parse_1pct.py          # Tahap 1 — parser PDF
-│   ├── parse_1pct_xlsx.py     # Tahap 1 — parser Excel (disarankan, jauh lebih stabil)
-│   ├── merge_fakta.py         # Tahap 2 — gabung ke fakta.csv (idempoten per periode)
-│   ├── fetch_yfinance.py      # Tahap 3 — ambil harga & sektor
-│   ├── hitung_metrik.py       # Tahap 4 — hitung CCS/CR1/CR3 & changelog
-│   ├── build_site.py          # Tahap 5 — rakit semuanya jadi docs/
-│   └── update_periode.py      # Orkestrator — jalankan Tahap 1→5 dari SATU perintah
-├── requirements.txt
-└── README.md
-```
+Semua sumber diperbarui oleh satu skrip, `update_data.py`. Skrip hanya mengambil yang baru, lalu commit dan push sendiri.
 
-> **Catatan:** `source.html` (template asli aplikasi, dibutuhkan `build_site.py`) sengaja **tidak** disimpan di repo ini — simpan salinannya di tempat aman lokal Anda.
+**Persiapan (sekali saja):**
 
-## Cara Kerja: Pipeline 5 Tahap
+1. Pasang **Git for Windows** (git-scm.com, atau di Command Prompt: `winget install --id Git.Git -e`). GitHub Desktop saja tidak cukup, karena skrip butuh perintah `git` untuk push otomatis.
+2. Pasang **Python 3.12 ke atas** (python.org, centang "Add python.exe to PATH") dan pastikan **Google Chrome** terpasang. Chrome dipakai untuk membuka situs BEI yang dilindungi Cloudflare.
+3. Clone repo ini, misalnya ke `Documents\GitHub\peta-institusi-idx` (lewat GitHub Desktop atau `git clone`).
+4. Di folder repo, jalankan: `py -m pip install -r requirements.txt`
+5. Klik dua kali `jalankan_update.bat` untuk uji coba pertama. Saat push pertama, Git membuka browser untuk login GitHub sekali; setelah itu tersimpan.
+6. Klik dua kali `pasang_jadwal.bat` supaya update jalan otomatis setiap hari jam 08.00. Kalau komputer mati atau tidur pada jam itu, update dijalankan begitu komputer menyala lagi.
+
+**Menjalankan manual:** klik dua kali `jalankan_update.bat`, atau dari terminal:
 
 ```
-Excel/PDF KSEI ──▶ 1·Parse ──▶ 2·Gabung fakta ──▶ 4·Hitung metrik ──▶ 5·Build situs ──▶ docs/
-                                     │
-                                     └──▶ 3·Harga & sektor (yfinance) ──▶┘
+py update_data.py              # semua sumber, lalu commit dan push
+py update_data.py --no-push    # tanpa git
+py update_data.py --only hsc   # hanya HSC (pilihan: ksei, idx, hsc)
+py update_data.py --show       # tampilkan jendela Chrome kalau mode tersembunyi ditolak BEI
 ```
 
-1. **Parse** — baca file laporan KSEI mentah → CSV 12 kolom terstandar (tanggal, kode, nama investor, tipe, jumlah saham, persentase, dst).
-2. **Gabung fakta** — masukkan ke `data/fakta.csv` multi-periode; klasifikasi investor dipetakan otomatis via `data/pemetaan_tipe.json` (belajar dari data historis, label baru yang belum pernah muncul akan ditandai untuk keputusan manual).
-3. **Harga & sektor** *(opsional)* — perkaya dengan data Yahoo Finance.
-4. **Hitung metrik** — CR1/CR3/HHI/CCS per emiten, plus changelog dua periode terbaru.
-5. **Build situs** — tempel semua data ke template, hasil akhir masuk `docs/`.
+Riwayat setiap update tersimpan di `update_log.txt` (hanya disimpan di komputer, tidak dikirim ke GitHub).
 
-## Setup Awal
+**Kalau persen HSC tidak terbaca otomatis:** skrip menulis catatan di kolom `catatan` pada `data_src/bei_hsc_pengumuman.csv`. Isi kolom `persen` dari PDF BEI, lalu jalankan `py update_hsc.py`.
 
-```bash
-git clone https://github.com/<username-anda>/ksei-ownership-dashboard.git
-cd ksei-ownership-dashboard
-pip install -r requirements.txt
+## Struktur folder
+
+```
+data.json                      Balancepos per emiten per bulan (dibaca index.html dan Smart Money)
+emiten_info.json               Sec. Num dan harga bulan terakhir (untuk % asing dan market cap)
+hsc.json                       Daftar HSC aktif, yang sudah keluar, dan riwayatnya
+data_src/                      File mentah dari sumber resmi
+  bei_hsc_pengumuman.csv
+  1pct/  klasifikasi/           File 1% (4 bulan terakhir) dan klasifikasi terbaru; file yang
+                               diupload manual ke folder utama juga terbaca
+  balancepos/                  Disimpan di komputer saja (lihat .gitignore)
+update_data.py                 Update semua sumber
+update_hsc.py                  Membangun hsc.json dari CSV pengumuman
+build_screener.py              Membangun screener.json untuk screener.html
+screener.json                  Data Screener (dibangun ulang otomatis setiap ada data baru)
+jalankan_update.bat            Jalankan update dengan klik dua kali
+pasang_jadwal.bat              Pasang jadwal update harian di Windows
 ```
 
-## 🔄 Update Data Bulanan
-
-Setiap KSEI merilis laporan baru:
-
-1. **Unduh** file laporan "1% \<tanggal\> \<bulan\> \<tahun\>" (format `.xlsx` disarankan; `.pdf` juga didukung).
-2. **Jalankan satu perintah:**
-   ```bash
-   python scripts/update_periode.py "1% 31 Agustus 2026.xlsx"
-   ```
-   Ini otomatis menjalankan Tahap 1 → 2 → 4 → 3 → 5 secara berurutan, berhenti kalau ada tahap yang gagal.
-   - Ketinggalan lebih dari satu bulan? Masukkan **semua file sekaligus** dalam satu perintah (bukan satu per satu), supaya pemetaan tipe investor konsisten:
-     ```bash
-     python scripts/update_periode.py "1% 30 Sep 2026.xlsx" "1% 31 Okt 2026.xlsx"
-     ```
-   - Mau lewati pengambilan harga (lebih cepat, tanpa internet)? tambahkan `--skip-harga`.
-   - Tahap 5 (build situs) hanya jalan kalau `source.html` ada di root folder.
-3. **Cek laporan** yang tercetak di terminal. Kalau ada klasifikasi investor baru yang belum punya pemetaan ("tanpa-bukti"), buka `data/pemetaan_tipe.json` dan isi manual kode tipenya (`CP`/`ID`/`IB`/`IS`/`OT`/`MF`/`PF`/`SC`/`FD`), lalu jalankan ulang langkah 2 (aman, idempoten).
-4. **Review** `git diff` / buka `docs/index.html` di browser untuk memastikan tampilannya benar.
-5. **Commit & push:**
-   ```bash
-   git add -A
-   git commit -m "Update periode <bulan> <tahun>"
-   git push
-   ```
-
-## Catatan & Keterbatasan
-
-- Tahap 3 (harga/sektor) butuh koneksi internet aktif ke Yahoo Finance saat dijalankan — kalau dilewati, badge harga/sektor sederhananya tidak muncul (bukan error).
-- Data PEP & grup konglomerat dikurasi independen dari sumber publik untuk tujuan riset dan edukasi, bukan tuduhan hukum atau saran finansial.
-- Free float di sini = 100% dikurangi total kepemilikan tercatat 1%+; ini indikator konsentrasi, bukan definisi *free float* yang presisi secara regulasi.
-
-## Tech Stack
-
-- **Pipeline data:** Python (`pdfplumber`, `pandas`, `openpyxl`, `yfinance`)
-- **Frontend:** HTML/CSS/JavaScript murni (tanpa build step) + [Chart.js](https://www.chartjs.org/) untuk grafik + [D3.js](https://d3js.org/) untuk graph jaringan
-- **Hosting:** GitHub Pages
-
-## Kredit
-
-- Sumber data: **KSEI** (Kustodian Sentral Efek Indonesia)
-- Harga & sektor: **Yahoo Finance**
-- Dibangun oleh [@alphamarett](https://www.threads.com/@alphamarett) — [dukung update di sini](https://sawerin.vercel.app/)
+`update_ksei.py` masih bisa dipakai untuk memasukkan satu file Balancepos secara manual, tapi sudah digantikan `update_data.py`.
 
 ## Disclaimer
 
-Dashboard ini dibuat untuk tujuan riset dan transparansi publik. Data disajikan apa adanya dari sumber resmi tanpa jaminan akurasi 100%. Selalu verifikasi ke sumber resmi sebelum mengambil keputusan finansial apa pun.
+Data disajikan apa adanya dari KSEI dan BEI untuk riset. Bukan rekomendasi jual atau beli. Selalu cek ulang ke sumber resmi.
