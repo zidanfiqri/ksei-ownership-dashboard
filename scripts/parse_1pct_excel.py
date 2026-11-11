@@ -92,18 +92,20 @@ def parse_excel(path, sheet_name=None):
     actual_header = next(
         ws.iter_rows(min_row=header_row, max_row=header_row, values_only=True)
     )
-    # Hanya 12 kolom pertama yang wajib cocok persis. Kolom ekstra di luar
-    # itu (mis. kolom ke-13 kosong tanpa header, artefak Excel) ditoleransi
-    # ASAL memang kosong di header-nya -- kalau ternyata berlabel, itu bisa
-    # jadi kolom baru yang perlu ditinjau, jadi dicatat sbg peringatan
-    # (bukan crash) supaya tidak diam-diam kebuang.
-    if list(actual_header[:12]) != EXPECTED_HEADER:
+    # Kolom dibaca BERDASARKAN NAMA, bukan posisi. Mulai edisi 30 Okt 2026 BEI/KSEI
+    # menyisipkan kolom CONTROLLER_OR_AFFILIATE (status pengendali/afiliasi) di
+    # antara INVESTOR_CLASSIFICATION dan LOCAL_FOREIGN. Ke-12 kolom wajib harus ada
+    # (urutan bebas); kolom berlabel lain dicatat di laporan dan tidak diikutkan ke
+    # CSV, supaya kontrak 12 kolom untuk merge_fakta.py tidak berubah.
+    labels = [str(v).strip() if v is not None else None for v in actual_header]
+    missing = [c for c in EXPECTED_HEADER if c not in labels]
+    if missing:
         raise RuntimeError(
-            f"Header ditemukan di baris {header_row} tapi 12 kolom pertama "
-            f"beda dari yang diharapkan.\n  ditemukan: {list(actual_header[:12])}\n"
-            f"  diharap  : {EXPECTED_HEADER}"
+            f"Header ditemukan di baris {header_row} tapi kolom wajib tidak ada: {missing}\n"
+            f"  ditemukan: {labels}"
         )
-    extra_header_labels = [v for v in actual_header[12:] if v is not None]
+    idx = [labels.index(c) for c in EXPECTED_HEADER]
+    extra_header_labels = [v for v in labels if v is not None and v not in EXPECTED_HEADER]
 
     records = []
     issues = defaultdict(list)
@@ -112,12 +114,13 @@ def parse_excel(path, sheet_name=None):
         "extra_header_labels": extra_header_labels,
     }
 
-    for rownum, row in enumerate(
-        ws.iter_rows(min_row=header_row + 1, max_col=12, values_only=True),
+    for rownum, full in enumerate(
+        ws.iter_rows(min_row=header_row + 1, values_only=True),
         start=header_row + 1,
     ):
+        full = tuple(full) + (None,) * (len(labels) - len(full))
         (date, code, issuer, investor, classif, lf, nat, dom,
-         scripless, scrip, total, pct) = row
+         scripless, scrip, total, pct) = (full[i] for i in idx)
 
         if date is None and code is None:
             stats["baris_kosong"] += 1
