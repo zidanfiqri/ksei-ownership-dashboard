@@ -1,0 +1,8 @@
+{
+ "_keterangan": "Pasangan nama lama -> nama baru yang dipastikan investor yang sama (dipakai changelog bila lembar identik). Tambah baris di sini setelah dicek manual dari bagian 'perlu cek' di laporan hitung_metrik.",
+ "alias": [
+  {"lama": "Panin Bank Tbk, PT", "baru": "BANK PAN INDONESIA TBK, PT", "catatan": "nama resmi PT Bank Panin = PT Bank Pan Indonesia Tbk"},
+  {"lama": "GLAS TRUST (S) LTD.", "baru": "Glas Trust (Singapore) Ltd", "catatan": "(S) = Singapore"},
+  {"lama": "PT PP PERSERO TBK", "baru": "PT PEMBANGUNAN PERUMAHAN (PERSERO)", "catatan": "PP = Pembangunan Perumahan"}
+ ]
+}

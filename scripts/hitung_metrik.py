@@ -37,6 +37,9 @@ Cara pakai:
 """
 
 import argparse
+import os
+import re
+from difflib import SequenceMatcher
 import csv
 import json
 import math
@@ -136,6 +139,74 @@ def agg_pairs(rows_periode):
     return agg
 
 
+# ---------- deteksi ganti nama investor ----------
+# KSEI kadang merapikan penulisan nama antar-periode (contoh edisi 30 Okt 2026:
+# "PT ASTRA INTERNATIONAL TBK" -> "ASTRA INTERNATIONAL TBK PT", "DANA PENSUN" ->
+# "DANA PENSIUN"). Tanpa deteksi, satu investor tampil sebagai "keluar" + "baru".
+# Aturan (per kode saham, hanya pasangan 1:1 yang unik):
+#   1. Nama ternormalisasi identik -> ganti nama (lembar boleh berubah; kalau berubah,
+#      dicatat sebagai "perubahan" dengan nama baru + nama_lama).
+#   2. Lembar identik DAN nama mirip (rasio >= 0.8 atau token satu nama termuat
+#      seluruhnya di nama lain) -> ganti nama.
+#   3. Lembar identik tapi nama tidak mirip -> TIDAK diubah (tetap keluar/baru), hanya
+#      dicatat di "perlu_cek" supaya ditinjau manual (bisa pengalihan saham sungguhan).
+LEGAL = {"PT", "TBK", "PERSERO", "PERSEROAN", "PERUSAHAAN", "LTD", "LIMITED", "PTE",
+         "INC", "CO", "CORP", "THE", "BHD", "SDN", "LLC", "PLC", "AG", "SA", "NV", "BV"}
+
+
+def norm_tokens(nama):
+    t = re.sub(r"[^A-Z0-9 ]", " ", nama.upper().replace(".", " "))
+    return tuple(sorted(x for x in t.split() if x not in LEGAL))
+
+
+def mirip(a, b):
+    ta, tb = norm_tokens(a), norm_tokens(b)
+    if not ta or not tb:
+        return False
+    if set(ta) <= set(tb) or set(tb) <= set(ta):
+        return True
+    return SequenceMatcher(None, " ".join(ta), " ".join(tb)).ratio() >= 0.8
+
+
+ALIAS = set()   # {(nama_lama, nama_baru)} dari data/alias_investor.json, diisi main()
+
+
+def pasangkan_ganti_nama(inv_b, inv_l, kandidat_b, kandidat_l):
+    """Kembalikan (pasangan [(lama, baru, jenis)], perlu_cek [(lama, baru)])."""
+    pasangan, cek = [], []
+    sisa_b, sisa_l = set(kandidat_b), set(kandidat_l)
+    # aturan 0: alias yang sudah dicek manual
+    for lama_n, baru_n in ALIAS:
+        if lama_n in sisa_l and baru_n in sisa_b:
+            pasangan.append((lama_n, baru_n, "alias"))
+            sisa_b.discard(baru_n); sisa_l.discard(lama_n)
+    # aturan 1: nama ternormalisasi identik
+    kunci_b, kunci_l = defaultdict(list), defaultdict(list)
+    for i in sisa_b:
+        kunci_b[norm_tokens(i)].append(i)
+    for i in sisa_l:
+        kunci_l[norm_tokens(i)].append(i)
+    for k, bs in kunci_b.items():
+        ls = kunci_l.get(k, [])
+        if k and len(bs) == 1 and len(ls) == 1:
+            pasangan.append((ls[0], bs[0], "nama"))
+            sisa_b.discard(bs[0]); sisa_l.discard(ls[0])
+    # aturan 2/3: lembar identik
+    per_lembar_b, per_lembar_l = defaultdict(list), defaultdict(list)
+    for i in sisa_b:
+        per_lembar_b[inv_b[i]["lembar"]].append(i)
+    for i in sisa_l:
+        per_lembar_l[inv_l[i]["lembar"]].append(i)
+    for lembar, bs in per_lembar_b.items():
+        ls = per_lembar_l.get(lembar, [])
+        if len(bs) == 1 and len(ls) == 1:
+            if mirip(ls[0], bs[0]):
+                pasangan.append((ls[0], bs[0], "lembar"))
+            else:
+                cek.append((ls[0], bs[0]))
+    return pasangan, cek
+
+
 def build_changelog(rows, periode_baru, periode_lama):
     baru = [r for r in rows if r["periode"] == periode_baru]
     lama = [r for r in rows if r["periode"] == periode_lama]
@@ -149,12 +220,25 @@ def build_changelog(rows, periode_baru, periode_lama):
 
     per_saham = {}
     inv_changes = {}
+    ganti_nama, perlu_cek = {}, {}
     n_inv_baru = n_inv_keluar = n_berubah = 0
 
     for kode in sorted(kode_baru | kode_lama):
         inv_b = {i: v for (k, i), v in p_baru.items() if k == kode}
         inv_l = {i: v for (k, i), v in p_lama.items() if k == kode}
         e = {"investor_baru": [], "investor_keluar": [], "perubahan": []}
+        pasangan, cek = pasangkan_ganti_nama(inv_b, inv_l, set(inv_b) - set(inv_l), set(inv_l) - set(inv_b))
+        lama_dari = {}
+        for lama_n, baru_n, jenis in pasangan:
+            ganti_nama.setdefault(kode, []).append(
+                {"nama_lama": lama_n, "nama_baru": baru_n, "dasar": jenis,
+                 "lembar_lama": inv_l[lama_n]["lembar"], "lembar_baru": inv_b[baru_n]["lembar"]})
+            lama_dari[baru_n] = lama_n
+            inv_l = dict(inv_l)
+            inv_l[baru_n] = inv_l.pop(lama_n)
+        for lama_n, baru_n in cek:
+            perlu_cek.setdefault(kode, []).append(
+                {"keluar": lama_n, "masuk": baru_n, "lembar": inv_b[baru_n]["lembar"]})
         for i in sorted(set(inv_b) - set(inv_l)):
             e["investor_baru"].append(
                 {"investor": i, "lembar": inv_b[i]["lembar"],
@@ -178,6 +262,7 @@ def build_changelog(rows, periode_baru, periode_lama):
             d_pct = round(inv_b[i]["pct"] - inv_l[i]["pct"], 2)
             e["perubahan"].append({
                 "investor": i,
+                **({"nama_lama": lama_dari[i]} if i in lama_dari else {}),
                 "lembar_lama": inv_l[i]["lembar"],
                 "lembar_baru": inv_b[i]["lembar"],
                 "delta_lembar": d_lembar,
@@ -202,7 +287,11 @@ def build_changelog(rows, periode_baru, periode_lama):
         "saham_dihapus": saham_dihapus,
         "per_saham": per_saham,
         "inv_changes": inv_changes,
+        "ganti_nama": ganti_nama,
+        "perlu_cek": perlu_cek,
         "ringkasan": {
+            "ganti_nama": sum(len(v) for v in ganti_nama.values()),
+            "perlu_cek": sum(len(v) for v in perlu_cek.values()),
             "saham_baru": len(saham_baru),
             "saham_dihapus": len(saham_dihapus),
             "saham_berubah": len(saham_berubah),
@@ -239,7 +328,12 @@ def main(argv=None):
     ap.add_argument("--report")
     ap.add_argument("--validasi-csv")
     ap.add_argument("--periode-validasi", default="2026-03-12")
+    ap.add_argument("--alias", default=os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                 "..", "data", "alias_investor.json"))
     args = ap.parse_args(argv)
+    if os.path.exists(args.alias):
+        with open(args.alias, encoding="utf-8") as f:
+            ALIAS.update((a["lama"], a["baru"]) for a in json.load(f).get("alias", []))
 
     rows = load_fakta(args.fakta)
     periods = sorted({r["periode"] for r in rows})
@@ -303,6 +397,11 @@ def main(argv=None):
         add(f"- Saham berubah: {r['saham_berubah']} | investor baru: "
             f"{r['investor_baru']} | investor keluar: {r['investor_keluar']} | "
             f"perubahan kepemilikan: {r['perubahan_kepemilikan']}")
+        add(f"- Ganti nama (tidak dihitung keluar/baru): {r['ganti_nama']} | lembar identik tapi nama "
+            f"tidak mirip, perlu cek manual: {r['perlu_cek']}")
+        for k, v in sorted(changelog["perlu_cek"].items()):
+            for x in v:
+                add(f"    - {k}: {x['keluar']!r} -> {x['masuk']!r} ({x['lembar']:,} lembar)")
         n_baru_pairs = sum(len(v) for v in
                            (changelog["per_saham"][k]["investor_baru"]
                             for k in changelog["per_saham"]))
